@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Customer Dashboard</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #e6f2ff;
+      margin: 0;
+      padding: 0;
+    }
+    .navbar {
+      background-color: #3399ff;
+      color: white;
+      padding: 1rem;
+      display: flex;
+      justify-content: space-between;
+    }
+    .tabs {
+      display: flex;
+      background-color: #3399ff;
+    }
+    .tab {
+      flex: 1;
+      text-align: center;
+      padding: 1rem;
+      cursor: pointer;
+      color: white;
+      font-weight: bold;
+    }
+    .tab:hover {
+      background-color: #267fd9;
+    }
+    .active-tab {
+      background-color: white;
+      color: #3399ff;
+      border-bottom: 3px solid #ff4d4d;
+    }
+    .dishes-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 30px;
+      justify-content: center;
+      margin-top: 20px;
+    }
+    .dish-card {
+      width: 400px;
+      background-color: #e8f0fe;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .dish-card img {
+      width: 100%;
+      height: 250px;
+      object-fit: cover;
+      border-radius: 10px;
+      margin-bottom: 15px;
+    }
+    .dish-card h3 {
+      margin: 8px 0;
+      font-size: 22px;
+      color: #333;
+    }
+    .dish-card p {
+      margin: 5px 0 10px 0;
+      font-size: 18px;
+      font-weight: bold;
+      color: #555;
+    }
+    .dish-card button {
+      background-color: #ff4d4d;
+      border: none;
+      color: white;
+      padding: 10px 20px;
+      margin-top: 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 17px;
+      width: 80%;
+    }
+    .dish-card button:hover {
+      background-color: #d43f3f;
+    }
+    .like-count {
+      font-size: 20px;
+      color: #ff4d4d;
+      margin-top: 5px;
+    }
+    .order-status {
+      font-size: 18px;
+      font-weight: bold;
+      color: #333;
+      margin: 8px 0;
+    }
+  </style>
+</head>
+<body>
+
+<div class="navbar">
+  <div>Customer Dashboard</div>
+  <button onclick="logout()" style="background-color: #ff4d4d; color: white; border: none; padding: 0.5rem; border-radius: 5px;">Logout</button>
+</div>
+
+<div class="tabs">
+  <div class="tab active-tab" onclick="showSection('veg')">Vegetarian</div>
+  <div class="tab" onclick="showSection('nonveg')">Non-Vegetarian</div>
+  <div class="tab" onclick="showSection('orders')">Orders</div>
+</div>
+
+<div class="dishes-container" id="dish-container"></div>
+
+<script>
+let allDishes = [];
+let allOrders = [];
+
+function logout() {
+  localStorage.clear();
+  window.location.href = "front.html";
+}
+
+async function fetchDishes() {
+  const res = await fetch('http://localhost:5000/customer/dishes');
+  const data = await res.json();
+  allDishes = data;
+  displayDishes('veg');
+}
+
+async function fetchOrders() {
+  const token = localStorage.getItem('token');
+  const res = await fetch('http://localhost:5000/customer/orders', {
+    headers: { "Authorization": "Bearer " + token }
+  });
+  const data = await res.json();
+  console.log("Fetched Orders →", data); 
+  allOrders = data;
+}
+
+async function showSection(section) {
+  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active-tab"));
+  if (section === 'veg') {
+    document.querySelectorAll(".tab")[0].classList.add("active-tab");
+    displayDishes('veg');
+  } else if (section === 'nonveg') {
+    document.querySelectorAll(".tab")[1].classList.add("active-tab");
+    displayDishes('nonveg');
+  } else {
+    document.querySelectorAll(".tab")[2].classList.add("active-tab");
+     await fetchOrders();  
+    displayOrders();
+  }
+}
+
+function displayDishes(type) {
+  const container = document.getElementById('dish-container');
+  container.innerHTML = "";
+  allDishes.filter(dish => dish.type === type).forEach(dish => {
+    const card = document.createElement('div');
+    card.className = "dish-card";
+    card.innerHTML = `
+      <img src="${dish.dishPhoto}" alt="Dish Photo">
+      <h3>${dish.dishName}</h3>
+      <p>Price: ₹${dish.price}</p>
+      <p>Vendor: ${dish.vendorId.name}</p>
+      <div class="like-count">❤️ ${dish.likes || 0}</div>
+      <button onclick="bookDish('${dish._id}')">Book Dish</button>
+    `;
+    container.appendChild(card);
+  });
+}
+
+async function bookDish(dishId) {
+  const token = localStorage.getItem('token');
+  await fetch('http://localhost:5000/customer/book', {
+    method: "POST",
+    headers: { "Authorization": "Bearer " + token, 
+               "Content-Type": "application/json" },
+    body: JSON.stringify({ dishId })
+
+  });
+  alert("Dish Booked Successfully!");
+  await fetchOrders();
+  showSection('orders');
+}
+
+function displayOrders() {
+  const container = document.getElementById('dish-container');
+  container.innerHTML = "";
+  allOrders.forEach(order => {
+    const card = document.createElement('div');
+    card.className = "dish-card";
+    card.innerHTML = `
+      <h3>${order.dishId?.dishName || 'Dish'}</h3>
+      <p class="order-status">
+         ${order.status === 'Pending' ? 'Pending' :
+         order.status === 'Ready' ? 'Order is getting ready' :
+         'Delivered'}
+      </p>
+      ${order.status === 'Ready' && !order.liked ? `<button onclick="confirmDelivery('${order._id}')">Confirm Delivery</button>` : ''}
+      ${order.status === 'Delivered' && !order.liked ? `<button onclick="likeDish('${order._id}')">Like Dish</button>` : ''}
+      ${order.status === 'Delivered' && order.liked ? `<p style="color: green;">Thank you for liking!</p>` : ''}
+    `;
+    container.appendChild(card);
+  });
+}
+
+async function confirmDelivery(orderId) {
+  const token = localStorage.getItem('token');
+  await fetch('http://localhost:5000/customer/confirm-delivery', {
+    method: "POST",
+    headers: { "Authorization": "Bearer " + token, 
+    "Content-Type": "application/json" },
+    body: JSON.stringify({ orderId, liked: false })
+  });
+  alert("Delivery Confirmed!");
+  await fetchOrders();
+  displayOrders();
+}
+
+async function likeDish(orderId) {
+  const token = localStorage.getItem('token');
+  await fetch('http://localhost:5000/customer/confirm-delivery', {
+    method: "POST",
+    headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
+    body: JSON.stringify({ orderId, liked: true })
+  });
+  alert("Thank you for liking!");
+  await fetchOrders();
+  await fetchDishes(); 
+  displayOrders();
+}
+
+window.onload = async () => {
+  await fetchDishes();
+  await fetchOrders();
+}
+</script>
+
+</body>
+</html>
