@@ -20,9 +20,9 @@
     const SECRET_KEY = "your_secret_key"; // use process.env.SECRET_KEY ideally
 
     // Import Models
-    const User = require("./User");  // you forgot to import User model
-    const Dish = require("./Dish");
-    const Booking = require("./Booking");
+    const User = require("./models/User");  // you forgot to import User model
+    const Dish = require("./models/Dish");
+    const Booking = require("./models/Booking");
     const Order = require("./models/Order");
 
     // Middleware
