@@ -42,6 +42,30 @@
     // Routes
 
     // Registration
+
+    
+
+    // Email existence check for OTP step
+app.post("/check-email", async (req, res) => {
+    try {
+        const { email } = req.body;
+
+        if (!email) {
+            return res.status(400).json({ message: "Email is required" });
+        }
+
+        const existingUser = await User.findOne({ email });
+        if (existingUser) {
+            return res.status(200).json({ exists: true });
+        } else {
+            return res.status(200).json({ exists: false });
+        }
+
+    } catch (error) {
+        res.status(500).json({ message: "Error checking email" });
+    }
+});
+
     app.post("/register", async (req, res) => {
         try {
             const { name, age, email, password, mobile, userType, address } = req.body;
