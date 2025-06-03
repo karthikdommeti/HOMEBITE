@@ -70,10 +70,11 @@ app.post("/check-email", async (req, res) => {
         try {
             const { name, age, email, password, mobile, userType, address } = req.body;
 
-            const existingUser = await User.findOne({ email });
-            if (existingUser) {
-                return res.status(400).json({ message: "Email already registered" });
+            const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{6,}$/;
+            if (!passwordRegex.test(password)) {
+              return res.status(400).json({ message: "Password must include at least 1 uppercase letter, 1 number, and 1 symbol (!@#$...), and be at least 6 characters long." });
             }
+
 
             const salt = await bcrypt.genSalt(10);
             const hashedPassword = await bcrypt.hash(password, salt);
