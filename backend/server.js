@@ -20,7 +20,7 @@
     const SECRET_KEY = "your_secret_key"; // use process.env.SECRET_KEY ideally
 
     // Import Models
-    const User = require("./models/User");  
+    const User = require("./models/User");  // you forgot to import User model
     const Dish = require("./models/Dish");
     const Booking = require("./models/Booking");
     const Order = require("./models/Order");
@@ -39,40 +39,17 @@
         }
     };
 
+    // Routes
 
     // Registration
-
-
-    // Email existence check for OTP step
-app.post("/check-email", async (req, res) => {
-    try {
-        const { email } = req.body;
-
-        if (!email) {
-            return res.status(400).json({ message: "Email is required" });
-        }
-
-        const existingUser = await User.findOne({ email });
-        if (existingUser) {
-            return res.status(200).json({ exists: true });
-        } else {
-            return res.status(200).json({ exists: false });
-        }
-
-    } catch (error) {
-        res.status(500).json({ message: "Error checking email" });
-    }
-});
-
     app.post("/register", async (req, res) => {
         try {
             const { name, age, email, password, mobile, userType, address } = req.body;
 
-            const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{6,}$/;
-            if (!passwordRegex.test(password)) {
-            return res.status(400).json({ message: "Password must include at least 1 uppercase letter, 1 number, and 1 symbol (!@#$...), and be at least 6 characters long." });
+            const existingUser = await User.findOne({ email });
+            if (existingUser) {
+                return res.status(400).json({ message: "Email already registered" });
             }
-
 
             const salt = await bcrypt.genSalt(10);
             const hashedPassword = await bcrypt.hash(password, salt);
@@ -130,115 +107,6 @@ app.post("/check-email", async (req, res) => {
         res.json({ message: "Access granted to protected route", user: req.user });
     });
 
-
-
-    
-    // Get all Dishes (Customer)
-    app.get("/customer/dishes", async (req, res) => {
-        try {
-            const dishes = await Dish.find().populate('vendorId', 'name mobile address likes');
-            res.status(200).json(dishes);
-        } catch (error) {
-            res.status(500).json({ message: "Server error fetching dishes" });
-        }
-    });
-
-    
-
-    //  Booking a Dish 
-    app.post("/book-dish", verifyToken, async (req, res) => {
-        try {
-            const { vendorId, customerName, customerMobile, customerAddress, dishName } = req.body;
-            const newBooking = new Booking({ vendorId, customerName, customerMobile, customerAddress, dishName });
-            await newBooking.save();
-            res.status(201).json({ message: "Dish booked successfully!" });
-        } catch (error) {
-            res.status(500).json({ message: "Server error while booking dish" });
-        }
-    });
-
-
-    
-    app.post("/customer/book", verifyToken, async (req, res) => {
-    try {
-        const { dishId } = req.body;
-        const dish = await Dish.findById(dishId).populate('vendorId');
-
-        if (!dish) return res.status(404).json({ message: "Dish not found" });
-
-        const customer = await User.findById(req.user.userId);
-
-        const booking = new Booking({
-        dishId: dish._id,
-        vendorId: dish.vendorId._id,
-        customerId: customer._id,
-        customerName: customer.name,
-        customerMobile: customer.mobile,
-        customerAddress: customer.address,
-        });
-
-        await booking.save();
-
-        res.status(201).json({ message: "Dish booked successfully!" });
-
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: "Server error while booking dish" });
-    }
-    });
-
-
-
-    // Customer fetches their orders
-    app.get("/customer/orders", verifyToken, async (req, res) => {
-  try {
-    const orders = await Booking.find({ customerId: req.user.userId }).populate('dishId');
-    res.json(orders);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error while fetching customer orders" });
-  }
-});
-
-
-
-
-    // Customer confirms delivery + optional like
-   app.post("/customer/confirm-delivery", verifyToken, async (req, res) => {
-  try {
-    const { orderId, liked } = req.body;
-
-    const order = await Booking.findById(orderId);
-    if (!order) return res.status(404).json({ message: "Order not found" });
-
-    //  Always mark as Delivered
-    order.status = "Delivered";
-
-    // ✅ Handle Like (only once)
-    if (liked && !order.liked) {
-      order.liked = true;
-
-      const dish = await Dish.findById(order.dishId);
-      if (dish) {
-        dish.likes = (dish.likes || 0) + 1;
-        await dish.save();
-      }
-    } else if (!liked) {
-      //  Explicitly mark as not liked
-      order.liked = false;
-    }
-
-    await order.save();
-    res.json({ message: "Order updated" });
-
-  } catch (error) {
-    console.error("Delivery error:", error);
-    res.status(500).json({ message: "Error confirming delivery" });
-  }
-});
-
-
-
     // Upload Dish (Vendor)
     app.post("/vendor/upload", verifyToken, async (req, res) => {
         try {
@@ -276,7 +144,29 @@ app.post("/check-email", async (req, res) => {
 
 
 
-    //  Vendor fetches all orders (old)
+    // Get all Dishes (Customer)
+    app.get("/customer/dishes", async (req, res) => {
+        try {
+            const dishes = await Dish.find().populate('vendorId', 'name mobile address likes');
+            res.status(200).json(dishes);
+        } catch (error) {
+            res.status(500).json({ message: "Server error fetching dishes" });
+        }
+    });
+
+    // ✅ Booking a Dish (old bookings system you already had)
+    app.post("/book-dish", verifyToken, async (req, res) => {
+        try {
+            const { vendorId, customerName, customerMobile, customerAddress, dishName } = req.body;
+            const newBooking = new Booking({ vendorId, customerName, customerMobile, customerAddress, dishName });
+            await newBooking.save();
+            res.status(201).json({ message: "Dish booked successfully!" });
+        } catch (error) {
+            res.status(500).json({ message: "Server error while booking dish" });
+        }
+    });
+
+    // ✅ Vendor fetches all orders (old)
     app.get("/vendor/orders", verifyToken, async (req, res) => {
     try {
         const orders = await Booking.find({ vendorId: req.user.userId }).populate('dishId');
@@ -286,6 +176,36 @@ app.post("/check-email", async (req, res) => {
         res.status(500).json({ message: "Server error while fetching orders" });
     }
     });
+
+    app.post("/customer/book", verifyToken, async (req, res) => {
+    try {
+        const { dishId } = req.body;
+        const dish = await Dish.findById(dishId).populate('vendorId');
+
+        if (!dish) return res.status(404).json({ message: "Dish not found" });
+
+        const customer = await User.findById(req.user.userId);
+
+        const booking = new Booking({
+        dishId: dish._id,
+        vendorId: dish.vendorId._id,
+        customerId: customer._id,
+        customerName: customer.name,
+        customerMobile: customer.mobile,
+        customerAddress: customer.address,
+        });
+
+        await booking.save();
+
+        res.status(201).json({ message: "Dish booked successfully!" });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Server error while booking dish" });
+    }
+    });
+
+
 
     // Vendor marks Order as Ready
    app.post("/vendor/mark-ready", verifyToken, async (req, res) => {
@@ -306,6 +226,52 @@ app.post("/check-email", async (req, res) => {
   }
 });
 
+
+    // Customer confirms delivery + optional like
+   app.post("/customer/confirm-delivery", verifyToken, async (req, res) => {
+  try {
+    const { orderId, liked } = req.body;
+
+    const order = await Booking.findById(orderId);
+    if (!order) return res.status(404).json({ message: "Order not found" });
+
+    // ✅ Always mark as Delivered
+    order.status = "Delivered";
+
+    // ✅ Handle Like (only once)
+    if (liked && !order.liked) {
+      order.liked = true;
+
+      const dish = await Dish.findById(order.dishId);
+      if (dish) {
+        dish.likes = (dish.likes || 0) + 1;
+        await dish.save();
+      }
+    } else if (!liked) {
+      // ✅ Explicitly mark as not liked
+      order.liked = false;
+    }
+
+    await order.save();
+    res.json({ message: "Order updated" });
+
+  } catch (error) {
+    console.error("Delivery error:", error);
+    res.status(500).json({ message: "Error confirming delivery" });
+  }
+});
+
+
+    // Customer fetches their orders
+    app.get("/customer/orders", verifyToken, async (req, res) => {
+  try {
+    const orders = await Booking.find({ customerId: req.user.userId }).populate('dishId');
+    res.json(orders);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error while fetching customer orders" });
+  }
+});
 
     // Vendor fetches their orders
     app.get("/vendor/all-orders", verifyToken, async (req, res) => {
