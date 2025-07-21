@@ -20,7 +20,7 @@
     const SECRET_KEY = "your_secret_key"; // use process.env.SECRET_KEY ideally
 
     // Import Models
-    const User = require("./models/User");  // you forgot to import User model
+    const User = require("./models/User");  
     const Dish = require("./models/Dish");
     const Booking = require("./models/Booking");
     const Order = require("./models/Order");
@@ -39,9 +39,42 @@
         }
     };
 
-    // Routes
 
-    // Registration
+// Email existence check for OTP step
+app.post("/check-email", async (req, res) => {
+    try {
+        const { email } = req.body;
+
+        if (!email) {
+            return res.status(400).json({ message: "Email is required" });
+        }
+
+        const existingUser = await User.findOne({ email });
+        if (existingUser) {
+            return res.status(200).json({ exists: true });
+        } else {
+            return res.status(200).json({ exists: false });
+        }
+
+    } catch (error) {
+        res.status(500).json({ message: "Error checking email" });
+    }
+});
+
+
+    // Add this route to your backend (e.g., auth.js)
+    app.post('/check-email', async (req, res) => {
+    const { email } = req.body;
+    try {
+        const user = await User.findOne({ email });
+        res.status(200).json({ exists: !!user }); // Don't send error code for existing
+    } catch (err) {
+        console.error("Email check error:", err);
+        res.status(500).json({ message: "Server error" });
+    }
+});
+
+
     app.post("/register", async (req, res) => {
         try {
             const { name, age, email, password, mobile, userType, address } = req.body;
@@ -107,6 +140,17 @@
         res.json({ message: "Access granted to protected route", user: req.user });
     });
 
+    // GET /api/dishes/vendor
+    app.get("/vendor/my-dishes", verifyToken, async (req, res) => {
+    try {
+        const dishes = await Dish.find({ vendorId: req.user.userId  });
+        res.json(dishes);
+    } catch (err) {
+        res.status(500).json({ error: "Error fetching vendor dishes" });
+    }
+    });
+
+
     // Upload Dish (Vendor)
     app.post("/vendor/upload", verifyToken, async (req, res) => {
         try {
@@ -160,7 +204,7 @@
             const { vendorId, customerName, customerMobile, customerAddress, dishName } = req.body;
             const newBooking = new Booking({ vendorId, customerName, customerMobile, customerAddress, dishName });
             await newBooking.save();
-            res.status(201).json({ message: "Dish booked successfully!" });
+            res.status(201).json({ message: toast('Here is your toast.') });
         } catch (error) {
             res.status(500).json({ message: "Server error while booking dish" });
         }
@@ -197,7 +241,7 @@
 
         await booking.save();
 
-        res.status(201).json({ message: "Dish booked successfully!" });
+        res.status(201).json({ message:"Dish booked successfully!", booking });
 
     } catch (err) {
         console.error(err);
@@ -282,6 +326,39 @@
             res.status(500).json({ message: "Server error" });
         }
     });
+
+    // GET dishes by vendor ID
+    app.get('/api/dishes/vendor/:vendorId', async (req, res) => {
+    try {
+        const vendorId = req.params.vendorId;
+        const dishes = await Dish.find({ vendorId: vendorId });
+        res.status(200).json(dishes);
+    } catch (error) {
+        console.error("Error fetching vendor dishes:", error);
+        res.status(500).json({ message: "Failed to fetch vendor dishes" });
+    }
+    });
+    // Delete Dish (Vendor)
+    app.delete("/vendor/delete-dish/:id", verifyToken, async (req, res) => {
+        try {
+            const dishId = req.params.id;
+            const dish = await Dish.findById(dishId);
+
+            if (!dish) {
+                return res.status(404).json({ message: "Dish not found" });
+            }
+
+            if (dish.vendorId.toString() !== req.user.userId) {
+                return res.status(403).json({ message: "You are not authorized to delete this dish" });
+            }
+
+            await Dish.findByIdAndDelete(dishId);
+            res.status(200).json({ message: "Dish deleted successfully" });
+        } catch (error) {
+            console.error("Error deleting dish:", error);
+            res.status(500).json({ message: "Server error while deleting dish" });
+        }   });
+
 
     // Server start
     const PORT = 5000;
